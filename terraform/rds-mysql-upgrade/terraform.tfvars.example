@@ -1,0 +1,6 @@
+aws_region                  = "us-east-1"
+db_instance_identifier      = "mysql-prod-01"
+source_engine_version       = "8.0.40"
+target_engine_version       = "8.4.7"
+allow_major_version_upgrade = true
+apply_immediately           = false
