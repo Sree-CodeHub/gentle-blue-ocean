@@ -53,7 +53,9 @@ After the code is pushed to GitHub, create or update the Jenkins multibranch job
   -GitCredentialsId "GitHub-PAT"
 ```
 
-The job defaults to `plan`. To actually provision the RDS instance, run the Jenkins build with:
+The job defaults to `validate` so automatic multibranch scans do not create AWS resources. To preview changes, run with `TF_ACTION=plan` and provide the required AWS inputs.
+
+To actually provision the RDS instance, run the Jenkins build with:
 
 - `TF_ACTION=apply`
 - `CONFIRM_APPLY=APPLY_RDS`

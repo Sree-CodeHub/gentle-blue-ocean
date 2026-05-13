@@ -28,7 +28,7 @@ pipeline {
   }
 
   parameters {
-    choice(name: 'TF_ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action to run.')
+    choice(name: 'TF_ACTION', choices: ['validate', 'plan', 'apply', 'destroy'], description: 'Terraform action to run.')
     string(name: 'CONFIRM_APPLY', defaultValue: '', description: 'Use APPLY_RDS for apply or DESTROY_RDS for destroy.')
     string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region for the RDS instance.')
     string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-credentials', description: 'Jenkins username/password credential ID. Username is AWS access key ID; password is AWS secret access key.')
@@ -62,11 +62,13 @@ pipeline {
     stage('Validate Parameters') {
       steps {
         script {
-          if (!params.VPC_ID?.trim()) {
-            error('VPC_ID is required.')
-          }
-          if (csvList(params.SUBNET_IDS).size() < 2) {
-            error('SUBNET_IDS must include at least two subnet IDs in different Availability Zones.')
+          if (params.TF_ACTION != 'validate') {
+            if (!params.VPC_ID?.trim()) {
+              error('VPC_ID is required.')
+            }
+            if (csvList(params.SUBNET_IDS).size() < 2) {
+              error('SUBNET_IDS must include at least two subnet IDs in different Availability Zones.')
+            }
           }
           if (params.TF_ACTION == 'apply' && params.CONFIRM_APPLY != 'APPLY_RDS') {
             error('Set CONFIRM_APPLY to APPLY_RDS before provisioning the RDS instance.')
@@ -79,6 +81,9 @@ pipeline {
     }
 
     stage('Write Terraform Variables') {
+      when {
+        expression { params.TF_ACTION != 'validate' }
+      }
       steps {
         script {
           def tfvars = [
@@ -127,6 +132,9 @@ pipeline {
     }
 
     stage('Terraform Plan') {
+      when {
+        expression { params.TF_ACTION != 'validate' }
+      }
       steps {
         withCredentials([
           usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
