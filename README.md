@@ -10,7 +10,7 @@ This repository contains Terraform code and a Jenkins pipeline to provision an A
 
 - `terraform/` provisions the RDS MySQL instance, subnet group, and optional security group.
 - `Jenkinsfile` runs Terraform `plan`, `apply`, or `destroy`.
-- `jenkins/rds-mysql-provision-job.xml` is a Jenkins Pipeline job template that points Jenkins at this repository.
+- `jenkins/rds-mysql-provision-job.xml` is a Jenkins multibranch Pipeline job template that points Jenkins at this repository.
 - `scripts/update-jenkins-job.ps1` creates or updates the Jenkins job through the Jenkins API.
 
 ## Jenkins Credentials
@@ -40,7 +40,7 @@ terraform -chdir=terraform validate
 
 ## Jenkins Job Creation
 
-After the code is pushed to GitHub, create or update the Jenkins job:
+After the code is pushed to GitHub, create or update the Jenkins multibranch job:
 
 ```powershell
 .\scripts\update-jenkins-job.ps1 `
