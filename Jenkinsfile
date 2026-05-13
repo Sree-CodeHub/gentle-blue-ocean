@@ -23,7 +23,6 @@ pipeline {
   agent any
 
   options {
-    ansiColor('xterm')
     timestamps()
     disableConcurrentBuilds()
   }
@@ -32,7 +31,7 @@ pipeline {
     choice(name: 'TF_ACTION', choices: ['plan', 'apply', 'destroy'], description: 'Terraform action to run.')
     string(name: 'CONFIRM_APPLY', defaultValue: '', description: 'Use APPLY_RDS for apply or DESTROY_RDS for destroy.')
     string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region for the RDS instance.')
-    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-credentials', description: 'Jenkins AWS credentials ID.')
+    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-credentials', description: 'Jenkins username/password credential ID. Username is AWS access key ID; password is AWS secret access key.')
     string(name: 'DB_PASSWORD_CREDENTIALS_ID', defaultValue: 'rds-mysql-master-password', description: 'Jenkins secret text credential ID for the RDS master password.')
     string(name: 'DB_IDENTIFIER', defaultValue: 'jenkins-rds-mysql', description: 'RDS instance identifier.')
     string(name: 'DB_NAME', defaultValue: 'appdb', description: 'Initial database name.')
@@ -66,8 +65,8 @@ pipeline {
           if (!params.VPC_ID?.trim()) {
             error('VPC_ID is required.')
           }
-          if (csvList(params.SUBNET_IDS).isEmpty()) {
-            error('SUBNET_IDS must include at least one subnet ID.')
+          if (csvList(params.SUBNET_IDS).size() < 2) {
+            error('SUBNET_IDS must include at least two subnet IDs in different Availability Zones.')
           }
           if (params.TF_ACTION == 'apply' && params.CONFIRM_APPLY != 'APPLY_RDS') {
             error('Set CONFIRM_APPLY to APPLY_RDS before provisioning the RDS instance.')
@@ -130,10 +129,10 @@ pipeline {
     stage('Terraform Plan') {
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: params.AWS_CREDENTIALS_ID],
+          usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
           string(credentialsId: params.DB_PASSWORD_CREDENTIALS_ID, variable: 'DB_PASSWORD')
         ]) {
-          withEnv(["TF_VAR_db_password=${DB_PASSWORD}"]) {
+          withEnv(["TF_VAR_db_password=${env.DB_PASSWORD}"]) {
             dir('terraform') {
               script {
                 if (params.TF_ACTION == 'destroy') {
@@ -154,10 +153,10 @@ pipeline {
       }
       steps {
         withCredentials([
-          [$class: 'AmazonWebServicesCredentialsBinding', credentialsId: params.AWS_CREDENTIALS_ID],
+          usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
           string(credentialsId: params.DB_PASSWORD_CREDENTIALS_ID, variable: 'DB_PASSWORD')
         ]) {
-          withEnv(["TF_VAR_db_password=${DB_PASSWORD}"]) {
+          withEnv(["TF_VAR_db_password=${env.DB_PASSWORD}"]) {
             dir('terraform') {
               runCommand('terraform apply -auto-approve -no-color tfplan')
             }
@@ -173,4 +172,3 @@ pipeline {
     }
   }
 }
-
