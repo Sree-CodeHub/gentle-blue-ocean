@@ -1,8 +1,12 @@
-aws_region = "us-east-1"
+aws_region = "eu-west-2"
 
-db_identifier = "jenkins-rds-mysql"
+resource_type       = "rds-mysql"
+resource_identifier = "jenkins-data-service"
+
+db_identifier = "jenkins-data-service"
 db_name       = "appdb"
 db_username   = "adminuser"
+engine_version = "8.0"
 
 manage_master_user_password = true
 
@@ -13,6 +17,20 @@ allowed_cidr_blocks = ["10.0.0.0/16"]
 
 publicly_accessible = false
 multi_az            = false
+
+# RDS MySQL resize controls.
+instance_class        = "db.t3.micro"
+allocated_storage    = 20
+max_allocated_storage = 100
+
+# Aurora MySQL controls when resource_type = "aurora-mysql".
+aurora_instance_count = 1
+aurora_storage_type   = ""
+
+# ElastiCache controls when resource_type starts with "elasticache-".
+cache_engine    = "redis"
+cache_node_type = "cache.t3.micro"
+cache_num_nodes = 1
 
 tags = {
   Environment = "dev"

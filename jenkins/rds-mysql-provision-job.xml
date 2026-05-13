@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='UTF-8'?>
 <org.jenkinsci.plugins.workflow.multibranch.WorkflowMultiBranchProject plugin="workflow-multibranch">
   <actions/>
-  <description>Provision AWS RDS MySQL using Terraform from GitHub.</description>
+  <description>Provision and operate AWS RDS, Aurora, and ElastiCache using Terraform from GitHub.</description>
   <displayName>rds_mysql_provision</displayName>
   <properties>
     <org.jenkinsci.plugins.configfiles.folder.FolderConfigFileProperty plugin="config-file-provider">
