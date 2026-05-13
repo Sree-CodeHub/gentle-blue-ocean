@@ -13,14 +13,36 @@ This repository contains Terraform code and a Jenkins pipeline to provision an A
 - `jenkins/rds-mysql-provision-job.xml` is a Jenkins multibranch Pipeline job template that points Jenkins at this repository.
 - `scripts/update-jenkins-job.ps1` creates or updates the Jenkins job through the Jenkins API.
 
-## Jenkins Credentials
+## AWS Authentication
 
-Create these Jenkins credentials before running `apply`:
+The Jenkins job can use an AWS CLI profile already configured on the Jenkins agent, so no AWS account password or AWS key credential is required in Jenkins.
 
-- `aws-credentials`: Jenkins username/password credential. Username is the AWS access key ID; password is the AWS secret access key.
-- `rds-mysql-master-password`: Secret text containing the RDS master password.
+Example profile setup on the Jenkins agent:
 
-The credential IDs are Jenkins parameters, so they can be changed at build time if your Jenkins uses different IDs.
+```powershell
+aws configure --profile uk-pci-staging
+```
+
+Example build parameters:
+
+```powershell
+AWS_PROFILE=connect-london
+AWS_REGION=eu-west-2
+```
+
+The pipeline exports `AWS_PROFILE`, `AWS_DEFAULT_REGION`, and `AWS_REGION`, then checks the active identity with:
+
+```powershell
+aws sts get-caller-identity
+```
+
+`AWS_CREDENTIALS_ID` is optional and should stay blank when using an AWS profile.
+
+## RDS Password
+
+By default, `MANAGE_MASTER_USER_PASSWORD=true`, so AWS Secrets Manager manages the RDS master password and no Jenkins database password credential is needed.
+
+If you set `MANAGE_MASTER_USER_PASSWORD=false`, create a Jenkins secret text credential and pass its ID as `DB_PASSWORD_CREDENTIALS_ID`.
 
 ## Required AWS Inputs
 
@@ -59,6 +81,8 @@ To actually provision the RDS instance, run the Jenkins build with:
 
 - `TF_ACTION=apply`
 - `CONFIRM_APPLY=APPLY_RDS`
+- `AWS_PROFILE=<profile-configured-on-jenkins-agent>`
+- `AWS_REGION=eu-west-2`
 
 For destroy, use:
 

@@ -33,3 +33,7 @@ output "db_security_group_ids" {
   value       = local.security_group_ids
 }
 
+output "db_master_user_secret_arn" {
+  description = "AWS Secrets Manager secret ARN for the managed master user password, when enabled."
+  value       = try(aws_db_instance.mysql.master_user_secret[0].secret_arn, null)
+}

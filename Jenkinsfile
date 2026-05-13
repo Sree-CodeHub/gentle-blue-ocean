@@ -19,6 +19,50 @@ def csvList(String value) {
     .findAll { it }
 }
 
+def withAwsAuthentication(String region, String profile, String credentialsId, Closure body) {
+  def awsEnv = [
+    "AWS_DEFAULT_REGION=${region.trim()}",
+    "AWS_REGION=${region.trim()}"
+  ]
+
+  if (profile?.trim()) {
+    awsEnv << "AWS_PROFILE=${profile.trim()}"
+  }
+
+  if (credentialsId?.trim()) {
+    withCredentials([
+      usernamePassword(credentialsId: credentialsId.trim(), usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY')
+    ]) {
+      withEnv(awsEnv) {
+        body()
+      }
+    }
+  } else {
+    withEnv(awsEnv) {
+      body()
+    }
+  }
+}
+
+def withDatabasePassword(Boolean manageMasterUserPassword, String credentialsId, Closure body) {
+  if (manageMasterUserPassword) {
+    body()
+    return
+  }
+
+  if (!credentialsId?.trim()) {
+    error('DB_PASSWORD_CREDENTIALS_ID is required when MANAGE_MASTER_USER_PASSWORD is false.')
+  }
+
+  withCredentials([
+    string(credentialsId: credentialsId.trim(), variable: 'DB_PASSWORD')
+  ]) {
+    withEnv(["TF_VAR_db_password=${env.DB_PASSWORD}"]) {
+      body()
+    }
+  }
+}
+
 pipeline {
   agent any
 
@@ -30,9 +74,11 @@ pipeline {
   parameters {
     choice(name: 'TF_ACTION', choices: ['validate', 'plan', 'apply', 'destroy'], description: 'Terraform action to run.')
     string(name: 'CONFIRM_APPLY', defaultValue: '', description: 'Use APPLY_RDS for apply or DESTROY_RDS for destroy.')
-    string(name: 'AWS_REGION', defaultValue: 'us-east-1', description: 'AWS region for the RDS instance.')
-    string(name: 'AWS_CREDENTIALS_ID', defaultValue: 'aws-credentials', description: 'Jenkins username/password credential ID. Username is AWS access key ID; password is AWS secret access key.')
-    string(name: 'DB_PASSWORD_CREDENTIALS_ID', defaultValue: 'rds-mysql-master-password', description: 'Jenkins secret text credential ID for the RDS master password.')
+    string(name: 'AWS_PROFILE', defaultValue: 'connect-london', description: 'AWS CLI profile available on the Jenkins agent. Leave blank to use the default AWS provider chain.')
+    string(name: 'AWS_REGION', defaultValue: 'eu-west-2', description: 'AWS region for the RDS instance and STS check.')
+    string(name: 'AWS_CREDENTIALS_ID', defaultValue: '', description: 'Optional Jenkins AWS key credential ID. Leave blank when using AWS_PROFILE.')
+    booleanParam(name: 'MANAGE_MASTER_USER_PASSWORD', defaultValue: true, description: 'Use AWS Secrets Manager to manage the RDS master password.')
+    string(name: 'DB_PASSWORD_CREDENTIALS_ID', defaultValue: '', description: 'Optional Jenkins secret text credential ID when MANAGE_MASTER_USER_PASSWORD is false.')
     string(name: 'DB_IDENTIFIER', defaultValue: 'jenkins-rds-mysql', description: 'RDS instance identifier.')
     string(name: 'DB_NAME', defaultValue: 'appdb', description: 'Initial database name.')
     string(name: 'DB_USERNAME', defaultValue: 'adminuser', description: 'RDS master username.')
@@ -87,20 +133,21 @@ pipeline {
       steps {
         script {
           def tfvars = [
-            aws_region           : params.AWS_REGION.trim(),
-            db_identifier        : params.DB_IDENTIFIER.trim(),
-            db_name              : params.DB_NAME.trim(),
-            db_username          : params.DB_USERNAME.trim(),
-            engine_version       : params.ENGINE_VERSION.trim(),
-            instance_class       : params.INSTANCE_CLASS.trim(),
-            allocated_storage    : params.ALLOCATED_STORAGE.toInteger(),
-            max_allocated_storage: params.MAX_ALLOCATED_STORAGE.toInteger(),
-            vpc_id               : params.VPC_ID.trim(),
-            subnet_ids           : csvList(params.SUBNET_IDS),
-            allowed_cidr_blocks  : csvList(params.ALLOWED_CIDRS),
-            publicly_accessible  : params.PUBLICLY_ACCESSIBLE,
-            skip_final_snapshot  : params.SKIP_FINAL_SNAPSHOT,
-            tags                 : [
+            aws_region                : params.AWS_REGION.trim(),
+            db_identifier             : params.DB_IDENTIFIER.trim(),
+            db_name                   : params.DB_NAME.trim(),
+            db_username               : params.DB_USERNAME.trim(),
+            manage_master_user_password: params.MANAGE_MASTER_USER_PASSWORD,
+            engine_version            : params.ENGINE_VERSION.trim(),
+            instance_class            : params.INSTANCE_CLASS.trim(),
+            allocated_storage         : params.ALLOCATED_STORAGE.toInteger(),
+            max_allocated_storage     : params.MAX_ALLOCATED_STORAGE.toInteger(),
+            vpc_id                    : params.VPC_ID.trim(),
+            subnet_ids                : csvList(params.SUBNET_IDS),
+            allowed_cidr_blocks       : csvList(params.ALLOWED_CIDRS),
+            publicly_accessible       : params.PUBLICLY_ACCESSIBLE,
+            skip_final_snapshot       : params.SKIP_FINAL_SNAPSHOT,
+            tags                      : [
               ManagedBy : 'Jenkins',
               Project   : 'rds-mysql-provision',
               Repository: env.JOB_NAME
@@ -131,18 +178,28 @@ pipeline {
       }
     }
 
+    stage('AWS Caller Identity') {
+      when {
+        expression { params.TF_ACTION != 'validate' }
+      }
+      steps {
+        script {
+          withAwsAuthentication(params.AWS_REGION, params.AWS_PROFILE, params.AWS_CREDENTIALS_ID) {
+            runCommand('aws sts get-caller-identity')
+          }
+        }
+      }
+    }
+
     stage('Terraform Plan') {
       when {
         expression { params.TF_ACTION != 'validate' }
       }
       steps {
-        withCredentials([
-          usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-          string(credentialsId: params.DB_PASSWORD_CREDENTIALS_ID, variable: 'DB_PASSWORD')
-        ]) {
-          withEnv(["TF_VAR_db_password=${env.DB_PASSWORD}"]) {
-            dir('terraform') {
-              script {
+        script {
+          withAwsAuthentication(params.AWS_REGION, params.AWS_PROFILE, params.AWS_CREDENTIALS_ID) {
+            withDatabasePassword(params.MANAGE_MASTER_USER_PASSWORD, params.DB_PASSWORD_CREDENTIALS_ID) {
+              dir('terraform') {
                 if (params.TF_ACTION == 'destroy') {
                   runCommand('terraform plan -destroy -out=tfplan -no-color')
                 } else {
@@ -160,13 +217,12 @@ pipeline {
         expression { params.TF_ACTION in ['apply', 'destroy'] }
       }
       steps {
-        withCredentials([
-          usernamePassword(credentialsId: params.AWS_CREDENTIALS_ID, usernameVariable: 'AWS_ACCESS_KEY_ID', passwordVariable: 'AWS_SECRET_ACCESS_KEY'),
-          string(credentialsId: params.DB_PASSWORD_CREDENTIALS_ID, variable: 'DB_PASSWORD')
-        ]) {
-          withEnv(["TF_VAR_db_password=${env.DB_PASSWORD}"]) {
-            dir('terraform') {
-              runCommand('terraform apply -auto-approve -no-color tfplan')
+        script {
+          withAwsAuthentication(params.AWS_REGION, params.AWS_PROFILE, params.AWS_CREDENTIALS_ID) {
+            withDatabasePassword(params.MANAGE_MASTER_USER_PASSWORD, params.DB_PASSWORD_CREDENTIALS_ID) {
+              dir('terraform') {
+                runCommand('terraform apply -auto-approve -no-color tfplan')
+              }
             }
           }
         }

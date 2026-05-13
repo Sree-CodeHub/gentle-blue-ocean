@@ -4,6 +4,8 @@ db_identifier = "jenkins-rds-mysql"
 db_name       = "appdb"
 db_username   = "adminuser"
 
+manage_master_user_password = true
+
 vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
 subnet_ids = ["subnet-xxxxxxxxxxxxxxxxx", "subnet-yyyyyyyyyyyyyyyyy"]
 
@@ -16,4 +18,3 @@ tags = {
   Environment = "dev"
   Owner       = "jenkins"
 }
-

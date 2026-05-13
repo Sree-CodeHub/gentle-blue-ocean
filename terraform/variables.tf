@@ -23,9 +23,16 @@ variable "db_username" {
 }
 
 variable "db_password" {
-  description = "Master password for the MySQL instance. Supply this through Jenkins credentials or TF_VAR_db_password."
+  description = "Optional master password for the MySQL instance. Required only when manage_master_user_password is false."
   type        = string
+  default     = null
   sensitive   = true
+}
+
+variable "manage_master_user_password" {
+  description = "Whether AWS Secrets Manager should manage the RDS master password."
+  type        = bool
+  default     = true
 }
 
 variable "db_port" {
@@ -163,4 +170,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-

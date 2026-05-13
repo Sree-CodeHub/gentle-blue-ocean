@@ -77,8 +77,10 @@ resource "aws_db_instance" "mysql" {
 
   db_name  = var.db_name
   username = var.db_username
-  password = var.db_password
+  password = var.manage_master_user_password ? null : var.db_password
   port     = var.db_port
+
+  manage_master_user_password = var.manage_master_user_password
 
   db_subnet_group_name   = aws_db_subnet_group.mysql.name
   vpc_security_group_ids = local.security_group_ids
@@ -99,4 +101,3 @@ resource "aws_db_instance" "mysql" {
     Name = var.db_identifier
   })
 }
-
