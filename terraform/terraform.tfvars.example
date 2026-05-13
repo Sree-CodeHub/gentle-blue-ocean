@@ -1,0 +1,19 @@
+aws_region = "us-east-1"
+
+db_identifier = "jenkins-rds-mysql"
+db_name       = "appdb"
+db_username   = "adminuser"
+
+vpc_id     = "vpc-xxxxxxxxxxxxxxxxx"
+subnet_ids = ["subnet-xxxxxxxxxxxxxxxxx", "subnet-yyyyyyyyyyyyyyyyy"]
+
+allowed_cidr_blocks = ["10.0.0.0/16"]
+
+publicly_accessible = false
+multi_az            = false
+
+tags = {
+  Environment = "dev"
+  Owner       = "jenkins"
+}
+
