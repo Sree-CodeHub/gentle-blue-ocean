@@ -20,13 +20,13 @@ The Jenkins job can use an AWS CLI profile already configured on the Jenkins age
 Example profile setup on the Jenkins agent:
 
 ```powershell
-aws configure --profile uk-pci-staging
+aws configure --profile <profile_name>
 ```
 
 Example build parameters:
 
 ```powershell
-AWS_PROFILE=connect-london
+AWS_PROFILE=<profile_name>
 AWS_REGION=eu-west-2
 ```
 
